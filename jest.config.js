@@ -40,6 +40,8 @@ export default {
         "src/scheduling/algorithms/osr/serialized-schedule-data.ts",
         "src/scheduling/algorithms/fsrs/serialized-schedule-data.ts",
         "src/data/data-store/base/idata-store-algorithm.ts",
+        "src/block-review/block-review-service.ts",
+        "src/block-review/block-review-manager.ts",
 
         // debugging utils
         "src/utils/debug.ts",

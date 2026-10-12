@@ -440,5 +440,45 @@ export class CommandManager {
                 await this.uiManager.sidebarManager.openReviewQueueView();
             },
         });
+
+        this.plugin.addCommand({
+            id: "block-review-open",
+            name: "Open block review",
+            callback: async () => {
+                if (!this.plugin.isInitialized) return;
+                await this.plugin.blockReviewManager.openView();
+            },
+        });
+
+        this.plugin.addCommand({
+            id: "block-review-open-config",
+            name: "Open block review settings",
+            callback: async () => {
+                await this.plugin.blockReviewManager.openConfigFile();
+            },
+        });
+
+        this.plugin.addCommand({
+            id: "block-review-insert-block",
+            name: "Insert review block",
+            editorCallback: (editor) => {
+                const { blockMarker, blockEndMarker } = this.plugin.blockReviewManager.getConfig();
+                const cursor = editor.getCursor();
+                editor.replaceRange(`\n${blockMarker}\n\n${blockEndMarker}\n`, cursor);
+                editor.setCursor({ line: cursor.line + 2, ch: 0 });
+            },
+        });
+
+        this.plugin.addCommand({
+            id: "block-review-insert-single-line",
+            name: "Insert single-line review block",
+            editorCallback: (editor) => {
+                const { blockMarker } = this.plugin.blockReviewManager.getConfig();
+                const cursor = editor.getCursor();
+                const insert = `${blockMarker} `;
+                editor.replaceRange(insert, cursor);
+                editor.setCursor({ line: cursor.line, ch: cursor.ch + insert.length });
+            },
+        });
     }
 }

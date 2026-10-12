@@ -1,6 +1,10 @@
-# Obsidian Spaced Repetition Plugin
+# Block Review + Flashcards (Obsidian Spaced Repetition fork)
 
 ![SR_Banner](./docs/media/en/SR_Banner.jpg)
+
+> This is a fork of the [Obsidian Spaced Repetition plugin](https://github.com/st3v3nmw/obsidian-spaced-repetition)
+> that adds **block review** — schedule any passage of a note for spaced repetition, not just
+> flashcards and whole notes. See [Block Review](#block-review-fork-addition) below.
 
 <img src="https://img.shields.io/github/downloads/st3v3nmw/obsidian-spaced-repetition/total" /> <img src="https://img.shields.io/github/downloads/st3v3nmw/obsidian-spaced-repetition/latest/total" /> <img src="https://img.shields.io/github/manifest-json/v/st3v3nmw/obsidian-spaced-repetition" /> <img alt="Codecov" src="https://img.shields.io/codecov/c/gh/st3v3nmw/obsidian-spaced-repetition">
 
@@ -117,6 +121,70 @@ This is where marking a note for review comes in handy.
 3. There you can open up the notes for review, just as if you would open them up in your file explorer, only that they are sorted her by when they are due for review
 4. Once you have recalled/reviewed your note you can rate your recall ability by executing the command(ctrl+p, or just via the 3 dots next to the note): _Review note as YOUR_RATING_ - The algorithm will take your rating into account to calculate a new due date, when you have to review it again
    <br/>
+
+## Block Review (fork addition)🧩
+
+This fork adds **block review**: mark any passage of a note as a reviewable block and schedule it
+with the plugin's active algorithm (FSRS by default). Unlike flashcards, block content stays visible
+in your notes — the markers are self-contained Obsidian comments, so your prose is never hidden.
+
+### Marking a block
+
+Wrap a block with two single-line comment markers, each on its own line:
+
+```markdown
+%% review %%
+The mitochondria is the powerhouse of the cell.
+%% /review %%
+```
+
+Keeping the markers on separate lines (instead of one `%% ... %%` pair) means the content between
+them renders normally in reading and editor views.
+
+Optionally configure the opening marker:
+
+```markdown
+%% review :type=flashcard :source="[[Biology#Cell]]" %%
+What is the powerhouse of the cell?
+---
+
+The mitochondria.
+%% /review %%
+```
+
+- `:type=recall` (default) — the whole block is the prompt.
+- `:type=flashcard` — text before the reveal separator is the front, the rest is the back.
+- `:source="[[Note#Heading]]"` — target of the "open source" link in the review view.
+- `:id=r-my-block` — a stable id; omit it and a deterministic id is derived from the content.
+
+Split a prompt from extra detail with the reveal separator (`---` by default, configurable):
+
+```markdown
+%% review :type=recall %%
+Explain osmosis.
+---
+
+Movement of water across a semi-permeable membrane, from low to high solute concentration.
+%% /review %%
+```
+
+Recall blocks show their content immediately and reveal the extra detail with **Show notes**.
+Flashcard blocks show the front first and reveal the back with **Show answer**.
+
+### Reviewing
+
+Open the panel from the command palette (Ctrl/Cmd+P): **Block review: Open block review**, then rate
+each due block **Again / Hard / Good / Easy**.
+
+### Where the data lives
+
+- Scheduling data for each block is stored inline in the note as a hidden record:
+  `%% sr-block {"version":1,"id":"r-1","schedule":{...}} %%` — it travels with the note.
+- Settings live in `ReviewConfig.md` at the vault root (created with defaults on first load).
+- Everything is plain text, so syncing the vault (for example via Git) carries your review state and
+  settings across desktop and mobile with no extra setup.
+
+<br/>
 
 ## Links & Resources🔗
 

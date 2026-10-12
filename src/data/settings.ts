@@ -162,7 +162,7 @@ export const DEFAULT_SETTINGS: SRSettings = {
     useCalloutsForSchedulingComments: false,
 
     // algorithm
-    algorithm: SRAlgorithmType.SM_2_OSR,
+    algorithm: SRAlgorithmType.FSRS,
     baseEase: 250,
     lapsesIntervalChange: 0.5,
     easyBonus: 1.3,

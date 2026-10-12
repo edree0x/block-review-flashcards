@@ -2,20 +2,20 @@ import console from "console";
 import esbuild from "esbuild";
 import fs from "fs";
 import { builtinModules } from "node:module";
-import path from "path";
 import prettier from "prettier";
 import process from "process";
 
 const prod = process.argv[2] === "production";
 
-// The published plugin expects CSS at the repository root, not under build/.
-// We also normalize the generated stylesheet through Prettier so CI does not
-// fail on formatting differences introduced by the bundler output.
+// Obsidian loads `main.js` and `styles.css` from the plugin folder root, so we
+// build straight to the root and rename esbuild's CSS bundle to styles.css.
+// We normalize the generated stylesheet through Prettier so CI does not fail on
+// formatting differences introduced by the bundler output.
 const moveToRootPlugin = {
     name: "move-to-root",
     setup(build) {
         build.onEnd(async (_) => {
-            const cssFile = path.join("build", "main.css");
+            const cssFile = "main.css";
             const targetFile = "styles.css";
 
             if (fs.existsSync(cssFile)) {
@@ -42,7 +42,7 @@ const context = await esbuild.context({
     sourcemap: "inline",
     sourcesContent: !prod,
     treeShaking: true,
-    outfile: "build/main.js",
+    outfile: "main.js",
     loader: {
         ".css": "css",
     },

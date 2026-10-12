@@ -5,6 +5,7 @@ import { DataManager } from "src/data/data-manager";
 import { SettingsManager } from "src/data/settings-manager";
 import { t } from "src/lang/helpers";
 import SRPlugin from "src/main";
+import { BlockReviewPage } from "src/ui/obsidian-ui-components/content-container/settings-page/block-review-page";
 import { DataPage } from "src/ui/obsidian-ui-components/content-container/settings-page/data-page";
 import { FlashcardsPage } from "src/ui/obsidian-ui-components/content-container/settings-page/flashcards-page";
 import { MainPage } from "src/ui/obsidian-ui-components/content-container/settings-page/main-page";
@@ -27,7 +28,8 @@ export type SettingsPageType =
     | "scheduling-page"
     | "ui-preferences-page"
     | "data-page"
-    | "statistics-page";
+    | "statistics-page"
+    | "block-review-page";
 
 /**
  * Represents an array of all available settings page types.
@@ -38,6 +40,7 @@ export const SettingsPageTypesArray: ReadonlyArray<SettingsPageType> = [
     "main-page",
     "flashcards-page",
     "notes-page",
+    "block-review-page",
     "scheduling-page",
     "ui-preferences-page",
     "data-page",
@@ -58,6 +61,8 @@ export function getPageName(pageType: SettingsPageType): string {
             return t("FLASHCARDS");
         case "notes-page":
             return t("NOTES");
+        case "block-review-page":
+            return "Block Review";
         case "scheduling-page":
             return t("SCHEDULING");
         case "ui-preferences-page":
@@ -83,6 +88,8 @@ export function getPageIcon(pageType: SettingsPageType): string {
             return "SpacedRepIcon";
         case "notes-page":
             return "book-text";
+        case "block-review-page":
+            return "layers";
         case "scheduling-page":
             return "calendar";
         case "ui-preferences-page":
@@ -202,6 +209,21 @@ export class SettingsPageManager {
                 case "notes-page":
                     this.pages.push(
                         new NotesPage(
+                            newPageContainerEl,
+                            this.plugin,
+                            this.settingsManager,
+                            this.dataManager,
+                            pageType,
+                            this.applySettingsUpdate.bind(this),
+                            this.display,
+                            this.openPage.bind(this),
+                            this.scrollListener.bind(this),
+                        ),
+                    );
+                    break;
+                case "block-review-page":
+                    this.pages.push(
+                        new BlockReviewPage(
                             newPageContainerEl,
                             this.plugin,
                             this.settingsManager,

@@ -1,10 +1,11 @@
 {
-    "name": "obsidian-spaced-repetition",
-    "version": "1.15.4",
-    "description": "Fight the forgetting curve by reviewing flashcards & entire notes.",
+    "name": "block-review-flashcards",
+    "version": "0.1.0",
+    "description": "Spaced repetition for blocks of Markdown plus flashcards; vault-stored, Git-syncable.",
     "main": "main.js",
     "scripts": {
         "build": "pnpm install && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+        "install:plugin": "bash scripts/install.sh",
         "dev": "node esbuild.config.mjs",
         "format": "pnpm prettier --write . && pnpm eslint src/ tests/ --fix",
         "lint": "pnpm prettier --check . && pnpm eslint src/ tests/",

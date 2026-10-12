@@ -1,5 +1,6 @@
 import { Plugin } from "obsidian";
 
+import { BLOCK_REVIEW_VIEW_TYPE, BlockReviewManager } from "src/block-review/block-review-manager";
 import { CommandManager } from "src/command-manager";
 import { DataManager } from "src/data/data-manager";
 import { DebugLoggerInstance } from "src/data/debug-logger";
@@ -10,6 +11,7 @@ import { LocaleManagerInstance } from "src/lang/locale-manager";
 import { NextNoteReviewHandler } from "src/note/next-note-review-handler";
 import { NoteReviewQueue } from "src/note/note-review-queue";
 import { ReminderManager } from "src/scheduling/reminder-manager";
+import { BlockReviewView } from "src/ui/obsidian-ui-components/block-review/block-review-view";
 import { REVIEW_QUEUE_VIEW_TYPE } from "src/ui/obsidian-ui-components/item-views/review-queue-list-view";
 import { UIManager } from "src/ui/ui-manager";
 import { TextDirection } from "src/utils/strings";
@@ -21,6 +23,7 @@ export default class SRPlugin extends Plugin {
     private _nextNoteReviewHandler: NextNoteReviewHandler | null = null;
     private _commandManager: CommandManager | null = null;
     private _reminderManager: ReminderManager | null = null;
+    private _blockReviewManager: BlockReviewManager | null = null;
     public isInitialized: boolean = false;
 
     async onload(): Promise<void> {
@@ -41,8 +44,19 @@ export default class SRPlugin extends Plugin {
             this.uiManager = uiManager;
             this.commandManager = new CommandManager(this, settingsManager, uiManager);
 
+            this._blockReviewManager = new BlockReviewManager(this.app);
+            this.registerView(
+                BLOCK_REVIEW_VIEW_TYPE,
+                (leaf) => new BlockReviewView(leaf, this.blockReviewManager),
+            );
+            this.addRibbonIcon("layers", "Block review", () => {
+                void this.blockReviewManager.openView();
+            });
+
             this.app.workspace.onLayoutReady(async () => {
                 this.dataManager.loadData();
+
+                await this.blockReviewManager.onLayoutReady();
 
                 // Set the preferred locale if it is not the default
                 if (settingsManager.settings.preferredLocale !== "-") {
@@ -128,9 +142,16 @@ export default class SRPlugin extends Plugin {
         return this._dataManager !== null;
     }
 
+    get blockReviewManager(): BlockReviewManager {
+        if (this._blockReviewManager === null)
+            throw new Error("Block review manager not initialized!!!");
+        return this._blockReviewManager;
+    }
+
     onunload(): void {
         this.reminderManager.stopReviewReminders();
         this.app.workspace.getLeavesOfType(REVIEW_QUEUE_VIEW_TYPE).forEach((leaf) => leaf.detach());
+        this.app.workspace.getLeavesOfType(BLOCK_REVIEW_VIEW_TYPE).forEach((leaf) => leaf.detach());
         this.uiManager.destroy();
         this.commandManager.onunload();
     }
