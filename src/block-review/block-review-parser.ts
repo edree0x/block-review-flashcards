@@ -55,10 +55,7 @@ export function splitBlockContent(
     }
 
     const content = lines.slice(0, separatorIndex).join("\n").trim();
-    const extra = lines
-        .slice(separatorIndex + 1)
-        .join("\n")
-        .trim();
+    const extra = lines.slice(separatorIndex + 1).join("\n").trim();
     return { content, extra: extra.length > 0 ? extra : null };
 }
 
@@ -146,26 +143,25 @@ export function parseNote(
         const trimmed = line.trim();
 
         if (inBlock) {
-            // Check for end marker at end of block (own line or ends with marker)
             const isEndOwnLine = trimmed === blockEndMarker;
             const isEndAtLineEnd =
                 blockEndMarker.length > 0 &&
-                line.endsWith(blockEndMarker) &&
+                line.trimEnd().endsWith(blockEndMarker) &&
                 !BLOCK_SCHEDULE_RECORD_MARKER.test(line);
 
             if (isEndOwnLine || isEndAtLineEnd) {
-                // Extract content up to but not including the end marker if it's at line end
-                let contentForThisLine = line;
-                if (isEndAtLineEnd && !isEndOwnLine) {
-                    contentForThisLine = line.slice(0, line.lastIndexOf(blockEndMarker));
-                } else {
-                    contentForThisLine = "";
-                }
-                // Add previous content lines (excluding this closing line's prefix)
+                const contentForThisLine = isEndAtLineEnd && !isEndOwnLine
+                    ? line.slice(0, line.trimEnd().lastIndexOf(blockEndMarker))
+                    : "";
+
                 const fullContentLines = [...contentLines];
-                if (contentForThisLine.length > 0 || (!isEndOwnLine && isEndAtLineEnd)) {
+                if (contentForThisLine.length > 0) {
                     fullContentLines.push(contentForThisLine);
+                } else if (isEndAtLineEnd && !isEndOwnLine && contentForThisLine.length === 0) {
+                    // Marker at end with nothing before - empty line to add if not already
+                    // but we need to handle correctly
                 }
+                // if end is own line, don't add current line content
                 const raw = fullContentLines.join("\n").trim();
                 const { content, extra } = splitBlockContent(raw, separator);
                 const item = createItem(
@@ -196,25 +192,25 @@ export function parseNote(
             continue;
         }
 
-        // Start of multi-line block
+        // Single-line style: marker followed by space (preserve existing behavior)
+        if (trimmed.startsWith(`${blockMarker} `)) {
+            const content = trimmed.slice(blockMarker.length).trim();
+            const item = createItem(notePath, content, null, "recall", i, i, schedules, noteGroups);
+            if (item) {
+                items.push(item);
+            }
+            continue;
+        }
+
         if (trimmed === blockMarker || line.startsWith(blockMarker)) {
             inBlock = true;
             openLine = i;
             contentLines = [];
-            // If marker is not on its own line and has content after, extract it
             if (trimmed !== blockMarker && line.startsWith(blockMarker)) {
                 const after = line.slice(blockMarker.length);
-                // For single-line style embedded content starting same line? The requirement says
-                // "on its own line (or at the block start)" - ambiguous. But for multi-line blocks
-                // typically content follows on next lines. Keep as-is for now.
-                // If there's content immediately after and no end marker on same line, treat as content starting?
-                // But easier to just not add content here; let the normal multi-line flow collect.
-                // However, if end marker is also on same line, we need different handling.
                 if (after.includes(blockEndMarker) && blockEndMarker.length > 0) {
                     const endIdx = after.lastIndexOf(blockEndMarker);
                     contentLines.push(after.slice(0, endIdx));
-                    // This is effectively a single-line-in-terms-of-content block but started as multi-line style?
-                    // Process immediately
                     const raw = contentLines.join("\n").trim();
                     const { content, extra } = splitBlockContent(raw, separator);
                     const item = createItem(
@@ -233,30 +229,13 @@ export function parseNote(
                     inBlock = false;
                     openLine = -1;
                     contentLines = [];
-                }
-                // else content starts after marker on same line? push it
-                else if (after.trim().length > 0 || after.length > 0) {
-                    // If just spaces after own-line style equivalent, empty; else push content
-                    if (trimmed === blockMarker) {
-                        // was own line case? no, we checked startsWith but trimmed !== blockMarker means has content
-                    }
-                    // For "at block start" case where marker is followed by content on same line
-                    // and no end marker, that content belongs to the block starting here
+                } else if (after.trim().length > 0 || after.length > 0) {
                     if (!(trimmed === blockMarker)) {
                         contentLines.push(after);
                     }
                 }
             }
             continue;
-        }
-
-        // Single-line style: marker followed by space (preserve existing behavior)
-        if (trimmed.startsWith(`${blockMarker} `)) {
-            const content = trimmed.slice(blockMarker.length).trim();
-            const item = createItem(notePath, content, null, "recall", i, i, schedules, noteGroups);
-            if (item) {
-                items.push(item);
-            }
         }
     }
 
