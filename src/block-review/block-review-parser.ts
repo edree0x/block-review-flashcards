@@ -138,48 +138,60 @@ export function parseNote(
     let openLine = -1;
     let contentLines: string[] = [];
 
+    const isStartMarkerLine = (trimmedLine: string): boolean =>
+        trimmedLine === blockMarker || trimmedLine.startsWith(blockMarker);
+
+    /**
+     * Whether a closing marker appears before the next opening marker. Used to
+     * decide if a `marker text` line is a single-line block (nothing closes it)
+     * or the first line of a multi-line block (a closer follows).
+     */
+    const hasCloserAhead = (from: number): boolean => {
+        for (let j = from; j < lines.length; j++) {
+            if (BLOCK_SCHEDULE_RECORD_MARKER.test(lines[j])) {
+                continue;
+            }
+            const candidate = lines[j].trim();
+            if (candidate === blockEndMarker) {
+                return true;
+            }
+            if (isStartMarkerLine(candidate)) {
+                return false;
+            }
+        }
+        return false;
+    };
+
+    const flushBlock = (endLine: number): void => {
+        const raw = contentLines.join("\n").trim();
+        const { content, extra } = splitBlockContent(raw, separator);
+        const item = createItem(
+            notePath,
+            content,
+            extra,
+            extra ? "flashcard" : "recall",
+            openLine,
+            endLine,
+            schedules,
+            noteGroups,
+        );
+        if (item) {
+            items.push(item);
+        }
+        inBlock = false;
+        openLine = -1;
+        contentLines = [];
+    };
+
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const trimmed = line.trim();
 
         if (inBlock) {
-            const isEndOwnLine = trimmed === blockEndMarker;
-            const isEndAtLineEnd =
-                blockEndMarker.length > 0 &&
-                line.trimEnd().endsWith(blockEndMarker) &&
-                !BLOCK_SCHEDULE_RECORD_MARKER.test(line);
-
-            if (isEndOwnLine || isEndAtLineEnd) {
-                const contentForThisLine = isEndAtLineEnd && !isEndOwnLine
-                    ? line.slice(0, line.trimEnd().lastIndexOf(blockEndMarker))
-                    : "";
-
-                const fullContentLines = [...contentLines];
-                if (contentForThisLine.length > 0) {
-                    fullContentLines.push(contentForThisLine);
-                } else if (isEndAtLineEnd && !isEndOwnLine && contentForThisLine.length === 0) {
-                    // Marker at end with nothing before - empty line to add if not already
-                    // but we need to handle correctly
-                }
-                // if end is own line, don't add current line content
-                const raw = fullContentLines.join("\n").trim();
-                const { content, extra } = splitBlockContent(raw, separator);
-                const item = createItem(
-                    notePath,
-                    content,
-                    extra,
-                    extra ? "flashcard" : "recall",
-                    openLine,
-                    i,
-                    schedules,
-                    noteGroups,
-                );
-                if (item) {
-                    items.push(item);
-                }
-                inBlock = false;
-                openLine = -1;
-                contentLines = [];
+            // The end marker must sit on its own line; a content line that
+            // merely ends with the marker text no longer closes the block.
+            if (trimmed === blockEndMarker) {
+                flushBlock(i);
                 continue;
             }
             if (!BLOCK_SCHEDULE_RECORD_MARKER.test(line)) {
@@ -192,50 +204,37 @@ export function parseNote(
             continue;
         }
 
-        // Single-line style: marker followed by space (preserve existing behavior)
-        if (trimmed.startsWith(`${blockMarker} `)) {
-            const content = trimmed.slice(blockMarker.length).trim();
-            const item = createItem(notePath, content, null, "recall", i, i, schedules, noteGroups);
+        if (!isStartMarkerLine(trimmed)) {
+            continue;
+        }
+
+        const afterMarker = trimmed.slice(blockMarker.length);
+        const inlineText = afterMarker.trim();
+        const isSingleLineForm =
+            afterMarker.startsWith(" ") && inlineText.length > 0 && !hasCloserAhead(i + 1);
+
+        if (isSingleLineForm) {
+            const item = createItem(
+                notePath,
+                inlineText,
+                null,
+                "recall",
+                i,
+                i,
+                schedules,
+                noteGroups,
+            );
             if (item) {
                 items.push(item);
             }
             continue;
         }
 
-        if (trimmed === blockMarker || line.startsWith(blockMarker)) {
-            inBlock = true;
-            openLine = i;
-            contentLines = [];
-            if (trimmed !== blockMarker && line.startsWith(blockMarker)) {
-                const after = line.slice(blockMarker.length);
-                if (after.includes(blockEndMarker) && blockEndMarker.length > 0) {
-                    const endIdx = after.lastIndexOf(blockEndMarker);
-                    contentLines.push(after.slice(0, endIdx));
-                    const raw = contentLines.join("\n").trim();
-                    const { content, extra } = splitBlockContent(raw, separator);
-                    const item = createItem(
-                        notePath,
-                        content,
-                        extra,
-                        extra ? "flashcard" : "recall",
-                        openLine,
-                        i,
-                        schedules,
-                        noteGroups,
-                    );
-                    if (item) {
-                        items.push(item);
-                    }
-                    inBlock = false;
-                    openLine = -1;
-                    contentLines = [];
-                } else if (after.trim().length > 0 || after.length > 0) {
-                    if (!(trimmed === blockMarker)) {
-                        contentLines.push(after);
-                    }
-                }
-            }
-            continue;
+        inBlock = true;
+        openLine = i;
+        contentLines = [];
+        if (inlineText.length > 0) {
+            contentLines.push(inlineText);
         }
     }
 

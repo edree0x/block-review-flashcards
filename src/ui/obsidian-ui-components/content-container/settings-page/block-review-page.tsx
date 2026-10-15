@@ -89,7 +89,7 @@ export class BlockReviewPage extends SettingsPage {
                 setting
                     .setName("Block start marker")
                     .setDesc(
-                        "Starts a block: `~! text` is a single-line block, and a line that is just `~!` opens a multi-line block.",
+                        "Starts a block. `~! text` is a single-line block when nothing closes it; if a `!~` closing line follows, `~! text` starts a multi-line block and `text` becomes its first line. A line that is just `~!` always opens a multi-line block.",
                     )
                     .addText((text) =>
                         text

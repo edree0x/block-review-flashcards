@@ -149,6 +149,57 @@ describe("parseNote", () => {
         expect(items[0].content).toEqual("custom body");
     });
 
+    test("treats a marker-with-text line as multi-line when a closer follows", () => {
+        const note = ["~! Capital of France?", "---", "Paris", "!~"].join("\n");
+        const items = parseNote("a.md", note);
+
+        expect(items).toHaveLength(1);
+        expect(items[0].type).toEqual("flashcard");
+        expect(items[0].content).toEqual("Capital of France?");
+        expect(items[0].extra).toEqual("Paris");
+        expect(items[0].startLine).toEqual(0);
+        expect(items[0].endLine).toEqual(3);
+    });
+
+    test("treats a marker-with-text line as multi-line recall when a closer follows", () => {
+        const note = ["~! first line", "second line", "!~"].join("\n");
+        const items = parseNote("a.md", note);
+
+        expect(items).toHaveLength(1);
+        expect(items[0].type).toEqual("recall");
+        expect(items[0].content).toEqual("first line\nsecond line");
+    });
+
+    test("keeps a marker-with-text single-line when no closer follows", () => {
+        const note = ["~! just one line", "plain text"].join("\n");
+        const items = parseNote("a.md", note);
+        expect(items).toHaveLength(1);
+        expect(items[0].content).toEqual("just one line");
+    });
+
+    test("parses a single-line block followed by a multi-line block", () => {
+        const note = ["~! quick", "~!", "long body line 1", "long body line 2", "!~"].join("\n");
+        const items = parseNote("a.md", note);
+        expect(items.map((item) => item.content)).toEqual([
+            "quick",
+            "long body line 1\nlong body line 2",
+        ]);
+    });
+
+    test("does not close a block when a content line merely ends with the end marker", () => {
+        const note = ["~!", "line one", "two !~", "line three", "!~"].join("\n");
+        const items = parseNote("a.md", note);
+        expect(items).toHaveLength(1);
+        expect(items[0].content).toEqual("line one\ntwo !~\nline three");
+    });
+
+    test("allows the start and end markers to be the same string", () => {
+        const note = ["??", "body line 1", "body line 2", "??"].join("\n");
+        const items = parseNote("a.md", note, { blockMarker: "??", blockEndMarker: "??" });
+        expect(items).toHaveLength(1);
+        expect(items[0].content).toEqual("body line 1\nbody line 2");
+    });
+
     test("attaches a schedule record found in the state region", () => {
         const id = deriveBlockId("a.md", "body");
         const scheduleRecord = `%% sr-block {"version":1,"id":"${id}","schedule":{"algorithm":"SM-2-OSR","scheduleData":{"dueDate":"2025-01-01","interval":3,"ease":250,"delayedBeforeReviewTicks":0}}} %%`;
