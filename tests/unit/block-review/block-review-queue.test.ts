@@ -3,9 +3,11 @@ import moment from "moment";
 import {
     blockInGroups,
     buildBlockReviewQueue,
+    buildUpcomingBlockQueue,
     compareBlockDueDate,
     countDueBlocks,
     isBlockDue,
+    isBlockUpcoming,
 } from "src/block-review/block-review-queue";
 import { BlockReviewItem } from "src/block-review/types";
 import { RepItemScheduleInfo } from "src/scheduling/algorithms/base/rep-item-schedule-info";
@@ -114,5 +116,45 @@ describe("block review queue", () => {
     test("still excludes future blocks when filtering by group", () => {
         const items = [makeItem("due", null, ["math"]), makeItem("future", "2023-09-30", ["math"])];
         expect(buildBlockReviewQueue(items, ["math"]).map((item) => item.id)).toEqual(["due"]);
+    });
+});
+
+describe("upcoming block queue", () => {
+    beforeEach(() => {
+        setupStaticDateProvider20230906();
+    });
+
+    test("treats only future-scheduled blocks as upcoming", () => {
+        expect(isBlockUpcoming(makeItem("new", null))).toEqual(false);
+        expect(isBlockUpcoming(makeItem("past", "2023-09-01"))).toEqual(false);
+        expect(isBlockUpcoming(makeItem("today", "2023-09-06"))).toEqual(false);
+        expect(isBlockUpcoming(makeItem("future", "2023-09-30"))).toEqual(true);
+    });
+
+    test("lists upcoming blocks soonest first", () => {
+        const items = [
+            makeItem("later", "2023-09-30"),
+            makeItem("new", null),
+            makeItem("due", "2023-09-01"),
+            makeItem("sooner", "2023-09-10"),
+        ];
+
+        expect(buildUpcomingBlockQueue(items).map((item) => item.id)).toEqual(["sooner", "later"]);
+    });
+
+    test("filters upcoming blocks by active groups", () => {
+        const items = [
+            makeItem("m1", "2023-09-10", ["math"]),
+            makeItem("a1", "2023-09-11", ["arabic"]),
+        ];
+
+        expect(buildUpcomingBlockQueue(items, ["math"]).map((item) => item.id)).toEqual(["m1"]);
+    });
+
+    test("does not mutate the input array", () => {
+        const items = [makeItem("later", "2023-09-30"), makeItem("sooner", "2023-09-10")];
+        const snapshot = [...items];
+        buildUpcomingBlockQueue(items);
+        expect(items).toEqual(snapshot);
     });
 });

@@ -1,6 +1,9 @@
 import { App, TFile, WorkspaceLeaf } from "obsidian";
 
-import { buildBlockReviewQueue } from "src/block-review/block-review-queue";
+import {
+    buildBlockReviewQueue,
+    buildUpcomingBlockQueue,
+} from "src/block-review/block-review-queue";
 import {
     BlockReviewScheduler,
     ratingToReviewResponse,
@@ -79,6 +82,19 @@ export class BlockReviewManager {
      */
     async getQueue(): Promise<BlockReviewItem[]> {
         return buildBlockReviewQueue(await this.scan(), this.config.activeGroups);
+    }
+
+    /**
+     * Both the due queue the review session walks through and the upcoming,
+     * already-scheduled blocks (soonest first), computed from a single vault
+     * scan so a finished session can still show when its blocks come back.
+     */
+    async getQueues(): Promise<{ due: BlockReviewItem[]; upcoming: BlockReviewItem[] }> {
+        const items = await this.scan();
+        return {
+            due: buildBlockReviewQueue(items, this.config.activeGroups),
+            upcoming: buildUpcomingBlockQueue(items, this.config.activeGroups),
+        };
     }
 
     /** Every distinct group (tag) currently used by a review block. */

@@ -10,6 +10,15 @@ export function isBlockDue(item: BlockReviewItem): boolean {
 }
 
 /**
+ * A block is upcoming when it has already been scheduled but is not due yet.
+ * These are the blocks the review view should list (with their due dates) so a
+ * finished session never leaves the panel empty.
+ */
+export function isBlockUpcoming(item: BlockReviewItem): boolean {
+    return item.schedule !== null && item.schedule !== undefined && !item.schedule.isDue();
+}
+
+/**
  * Orders due blocks by due date (new blocks first) then by id for a stable,
  * deterministic queue.
  */
@@ -52,5 +61,19 @@ export function buildBlockReviewQueue(
 ): BlockReviewItem[] {
     return items
         .filter((item) => isBlockDue(item) && blockInGroups(item, activeGroups))
+        .sort(compareBlockDueDate);
+}
+
+/**
+ * Filters to the upcoming (scheduled but not yet due) blocks, soonest first.
+ * When `activeGroups` is non-empty only blocks in those groups are included.
+ * The input array is not mutated.
+ */
+export function buildUpcomingBlockQueue(
+    items: BlockReviewItem[],
+    activeGroups: string[] = [],
+): BlockReviewItem[] {
+    return items
+        .filter((item) => isBlockUpcoming(item) && blockInGroups(item, activeGroups))
         .sort(compareBlockDueDate);
 }

@@ -1,8 +1,18 @@
 import "src/ui/obsidian-ui-components/block-review/block-review-view.css";
-import { ItemView, MarkdownRenderer, setIcon, WorkspaceLeaf } from "obsidian";
+import { debounce, ItemView, MarkdownRenderer, setIcon, WorkspaceLeaf } from "obsidian";
 
 import { BLOCK_REVIEW_VIEW_TYPE, BlockReviewManager } from "src/block-review/block-review-manager";
 import { BlockReviewItem, ReviewRating } from "src/block-review/types";
+import { globalDateProvider } from "src/utils/dates";
+
+/** How many days relative to today a "due" label mentions before falling back to a date. */
+const MAX_RELATIVE_DUE_DAYS = 14;
+
+function previewText(content: string): string {
+    const firstLine = content.split(/\r?\n/).find((line) => line.trim().length > 0) ?? content;
+    const trimmed = firstLine.trim();
+    return trimmed.length > 80 ? `${trimmed.slice(0, 77)}...` : trimmed;
+}
 
 interface RatingOption {
     rating: ReviewRating;
@@ -26,12 +36,32 @@ const RATING_OPTIONS: RatingOption[] = [
 export class BlockReviewView extends ItemView {
     private readonly manager: BlockReviewManager;
     private queue: BlockReviewItem[] = [];
+    private upcoming: BlockReviewItem[] = [];
     private index = 0;
     private revealed = false;
+
+    /**
+     * Refreshes the view when the vault changes so the list stays accurate
+     * without a manual refresh. It never interrupts an in-progress session.
+     */
+    private readonly scheduleRefresh = debounce(
+        () => {
+            if (!this.sessionActive) {
+                void this.reload();
+            }
+        },
+        800,
+        true,
+    );
 
     constructor(leaf: WorkspaceLeaf, manager: BlockReviewManager) {
         super(leaf);
         this.manager = manager;
+    }
+
+    /** Whether a card is currently on screen (a rating would advance it). */
+    private get sessionActive(): boolean {
+        return this.queue.length > 0 && this.index < this.queue.length;
     }
 
     getViewType(): string {
@@ -47,14 +77,22 @@ export class BlockReviewView extends ItemView {
     }
 
     async onOpen(): Promise<void> {
+        this.registerEvent(this.app.vault.on("modify", () => this.scheduleRefresh()));
+        this.registerEvent(this.app.vault.on("create", () => this.scheduleRefresh()));
+        this.registerEvent(this.app.vault.on("delete", () => this.scheduleRefresh()));
+        this.registerEvent(this.app.vault.on("rename", () => this.scheduleRefresh()));
+        this.register(() => this.scheduleRefresh.cancel());
         await this.reload();
     }
 
     private async reload(): Promise<void> {
         try {
-            this.queue = await this.manager.getQueue();
+            const { due, upcoming } = await this.manager.getQueues();
+            this.queue = due;
+            this.upcoming = upcoming;
         } catch {
             this.queue = [];
+            this.upcoming = [];
         }
         this.index = 0;
         this.revealed = false;
@@ -77,17 +115,18 @@ export class BlockReviewView extends ItemView {
             return;
         }
 
+        if (this.sessionActive) {
+            this.renderCard(root, this.queue[this.index]);
+            return;
+        }
+
         if (this.queue.length === 0) {
             this.renderMessage(root, "check-circle", "No blocks are due right now.");
-            return;
-        }
-
-        if (this.index >= this.queue.length) {
+        } else {
             this.renderSummary(root);
-            return;
         }
 
-        this.renderCard(root, this.queue[this.index]);
+        this.renderUpcoming(root, this.upcoming);
     }
 
     private renderHeader(root: HTMLElement): void {
@@ -206,7 +245,91 @@ export class BlockReviewView extends ItemView {
             this.index += 1;
         }
         this.revealed = false;
+
+        if (this.index >= this.queue.length) {
+            // The session just finished: rescan so the reviewed blocks show up
+            // under "Upcoming" with their next due dates instead of vanishing.
+            await this.reload();
+        } else {
+            this.render();
+        }
+    }
+
+    private reviewNow(item: BlockReviewItem): void {
+        this.queue = [item];
+        this.upcoming = this.upcoming.filter((candidate) => candidate.id !== item.id);
+        this.index = 0;
+        this.revealed = false;
         this.render();
+    }
+
+    private dueLabel(item: BlockReviewItem): string {
+        if (item.schedule === null) {
+            return "New";
+        }
+        const formatted = item.schedule.formatDueDate();
+        const days = item.schedule.dueDate
+            .clone()
+            .startOf("day")
+            .diff(globalDateProvider.now.clone().startOf("day"), "days");
+        if (days <= 0) {
+            return `due ${formatted}`;
+        }
+        if (days === 1) {
+            return `due ${formatted} (tomorrow)`;
+        }
+        if (days <= MAX_RELATIVE_DUE_DAYS) {
+            return `due ${formatted} (in ${days} days)`;
+        }
+        return `due ${formatted}`;
+    }
+
+    private renderUpcoming(root: HTMLElement, items: BlockReviewItem[]): void {
+        if (items.length === 0) {
+            return;
+        }
+
+        const section = root.createDiv("block-review-upcoming");
+        const header = section.createDiv("block-review-upcoming-header");
+        header.createSpan({ cls: "block-review-upcoming-title", text: "Upcoming" });
+        header.createSpan({
+            cls: "block-review-upcoming-count",
+            text: `${items.length}`,
+        });
+
+        const list = section.createDiv("block-review-upcoming-list");
+        for (const item of items) {
+            const row = list.createDiv("block-review-upcoming-item");
+
+            row.createSpan({
+                cls: "block-review-badge block-review-upcoming-badge",
+                text: item.type === "flashcard" ? "Flashcard" : "Recall",
+            });
+
+            const body = row.createDiv("block-review-upcoming-body");
+            const sourceLink = body.createEl("a", {
+                cls: "block-review-source",
+                text: item.source ?? item.notePath,
+            });
+            sourceLink.addEventListener("click", (event) => {
+                event.preventDefault();
+                this.openSource(item);
+            });
+            body.createDiv({
+                cls: "block-review-upcoming-preview",
+                text: previewText(item.content),
+            });
+
+            const side = row.createDiv("block-review-upcoming-side");
+            side.createSpan({ cls: "block-review-due", text: this.dueLabel(item) });
+            const reviewNowButton = side.createEl("button", {
+                cls: "block-review-review-now",
+                text: "Review now",
+            });
+            reviewNowButton.addEventListener("click", () => {
+                this.reviewNow(item);
+            });
+        }
     }
 
     private openSource(item: BlockReviewItem): void {
