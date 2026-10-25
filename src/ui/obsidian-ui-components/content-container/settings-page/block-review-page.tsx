@@ -241,6 +241,114 @@ export class BlockReviewPage extends SettingsPage {
                     );
             });
 
+        new SettingGroup(this.containerEl)
+            .setHeading("Reminders")
+            .addSetting((setting: Setting) => {
+                setting
+                    .setName("Enable block review reminders")
+                    .setDesc(
+                        "Periodically check for due block-review blocks and surface a notification.",
+                    )
+                    .addToggle((toggle) =>
+                        toggle
+                            .setValue(
+                                plugin.blockReviewManager.getConfig().blockReviewRemindersEnabled,
+                            )
+                            .onChange(async (value) => {
+                                applySettingsUpdate(async () => {
+                                    await plugin.blockReviewManager.updateConfig({
+                                        blockReviewRemindersEnabled: value,
+                                    });
+                                    plugin.blockReviewReminderManager.restart();
+                                });
+                            }),
+                    );
+            })
+            .addSetting((setting: Setting) => {
+                setting
+                    .setName("Check interval (minutes)")
+                    .setDesc("How often the reminder loop checks for due blocks.")
+                    .addText((text) =>
+                        text
+                            .setPlaceholder("5")
+                            .setValue(
+                                String(
+                                    plugin.blockReviewManager.getConfig()
+                                        .blockReviewReminderIntervalMinutes,
+                                ),
+                            )
+                            .onChange((value) => {
+                                const parsed = Number.parseInt(value, 10);
+                                if (Number.isNaN(parsed) || parsed <= 0) {
+                                    return;
+                                }
+                                applySettingsUpdate(async () => {
+                                    await plugin.blockReviewManager.updateConfig({
+                                        blockReviewReminderIntervalMinutes: parsed,
+                                    });
+                                    plugin.blockReviewReminderManager.restart();
+                                });
+                            }),
+                    );
+            })
+            .addSetting((setting: Setting) => {
+                setting
+                    .setName("Show notification toast")
+                    .setDesc("Display an Obsidian toast when due blocks are detected.")
+                    .addToggle((toggle) =>
+                        toggle
+                            .setValue(
+                                plugin.blockReviewManager.getConfig().blockReviewReminderNotify,
+                            )
+                            .onChange(async (value) => {
+                                applySettingsUpdate(async () => {
+                                    await plugin.blockReviewManager.updateConfig({
+                                        blockReviewReminderNotify: value,
+                                    });
+                                });
+                            }),
+                    );
+            })
+            .addSetting((setting: Setting) => {
+                setting
+                    .setName("Auto-open block review panel")
+                    .setDesc(
+                        "Open the block review panel automatically when due blocks are detected.",
+                    )
+                    .addToggle((toggle) =>
+                        toggle
+                            .setValue(
+                                plugin.blockReviewManager.getConfig().blockReviewReminderAutoOpen,
+                            )
+                            .onChange(async (value) => {
+                                applySettingsUpdate(async () => {
+                                    await plugin.blockReviewManager.updateConfig({
+                                        blockReviewReminderAutoOpen: value,
+                                    });
+                                });
+                            }),
+                    );
+            })
+            .addSetting((setting: Setting) => {
+                setting
+                    .setName("Notify on startup")
+                    .setDesc("Run a one-shot check when the plugin loads.")
+                    .addToggle((toggle) =>
+                        toggle
+                            .setValue(
+                                plugin.blockReviewManager.getConfig()
+                                    .blockReviewReminderCheckOnStartup,
+                            )
+                            .onChange(async (value) => {
+                                applySettingsUpdate(async () => {
+                                    await plugin.blockReviewManager.updateConfig({
+                                        blockReviewReminderCheckOnStartup: value,
+                                    });
+                                });
+                            }),
+                    );
+            });
+
         void this.renderGroups();
     }
 

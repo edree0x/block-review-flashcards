@@ -121,9 +121,9 @@ export class BlockReviewView extends ItemView {
         }
 
         if (this.queue.length === 0) {
-            this.renderMessage(root, "check-circle", "No blocks are due right now.");
+            this.renderEmptyState(root);
         } else {
-            this.renderSummary(root);
+            this.renderCompletionSummary(root);
         }
 
         this.renderUpcoming(root, this.upcoming);
@@ -176,6 +176,39 @@ export class BlockReviewView extends ItemView {
         summary.createDiv({ text: "All due blocks reviewed." });
 
         const again = summary.createEl("button", { text: "Review again", cls: "mod-cta" });
+        again.addEventListener("click", () => {
+            void this.reload();
+        });
+    }
+
+    /**
+     * Compact banner shown when the due queue is empty. Unlike the loading
+     * message this does not take over the view — the upcoming list renders
+     * beneath it.
+     */
+    private renderEmptyState(root: HTMLElement): void {
+        const banner = root.createDiv("block-review-empty-state");
+        const icon = banner.createDiv("block-review-empty-state-icon");
+        setIcon(icon, "check-circle");
+        banner.createSpan({ text: "No blocks are due right now." });
+
+        const again = banner.createEl("button", { text: "Review again", cls: "mod-cta" });
+        again.addEventListener("click", () => {
+            void this.reload();
+        });
+    }
+
+    /**
+     * Compact banner shown after a session finishes. Renders above the upcoming
+     * list so the user can start another pass without the view collapsing.
+     */
+    private renderCompletionSummary(root: HTMLElement): void {
+        const banner = root.createDiv("block-review-empty-state");
+        const icon = banner.createDiv("block-review-empty-state-icon");
+        setIcon(icon, "check-circle");
+        banner.createSpan({ text: "All due blocks reviewed." });
+
+        const again = banner.createEl("button", { text: "Review again", cls: "mod-cta" });
         again.addEventListener("click", () => {
             void this.reload();
         });
@@ -263,25 +296,58 @@ export class BlockReviewView extends ItemView {
         this.render();
     }
 
+    /**
+     * Human-readable, relative label for a block's due date.
+     *
+     * Overdue items read "Overdue by N days", today reads "Due today", and
+     * upcoming items read "Due tomorrow" / "Due in N days" before falling back
+     * to a plain date. New (never-reviewed) blocks read "New".
+     */
     private dueLabel(item: BlockReviewItem): string {
         if (item.schedule === null) {
             return "New";
         }
-        const formatted = item.schedule.formatDueDate();
+        const days = item.schedule.dueDate
+            .clone()
+            .startOf("day")
+            .diff(globalDateProvider.now.clone().startOf("day"), "days");
+        if (days < -1) {
+            return `Overdue by ${-days} days`;
+        }
+        if (days === -1) {
+            return "Overdue by 1 day";
+        }
+        if (days === 0) {
+            return "Due today";
+        }
+        if (days === 1) {
+            return "Due tomorrow";
+        }
+        if (days <= MAX_RELATIVE_DUE_DAYS) {
+            return `Due in ${days} days`;
+        }
+        return `Due ${item.schedule.formatDueDate()}`;
+    }
+
+    /**
+     * Severity class for the due label so overdue / today items stand out,
+     * near-future items warn, and far-future items stay muted.
+     */
+    private dueSeverity(item: BlockReviewItem): string {
+        if (item.schedule === null) {
+            return "block-review-due-new";
+        }
         const days = item.schedule.dueDate
             .clone()
             .startOf("day")
             .diff(globalDateProvider.now.clone().startOf("day"), "days");
         if (days <= 0) {
-            return `due ${formatted}`;
+            return "mod-error";
         }
-        if (days === 1) {
-            return `due ${formatted} (tomorrow)`;
+        if (days <= 7) {
+            return "mod-warning";
         }
-        if (days <= MAX_RELATIVE_DUE_DAYS) {
-            return `due ${formatted} (in ${days} days)`;
-        }
-        return `due ${formatted}`;
+        return "block-review-due-future";
     }
 
     private renderUpcoming(root: HTMLElement, items: BlockReviewItem[]): void {
@@ -321,7 +387,10 @@ export class BlockReviewView extends ItemView {
             });
 
             const side = row.createDiv("block-review-upcoming-side");
-            side.createSpan({ cls: "block-review-due", text: this.dueLabel(item) });
+            side.createSpan({
+                cls: `block-review-due ${this.dueSeverity(item)}`,
+                text: this.dueLabel(item),
+            });
             const reviewNowButton = side.createEl("button", {
                 cls: "block-review-review-now",
                 text: "Review now",

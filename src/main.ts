@@ -1,6 +1,7 @@
 import { Plugin } from "obsidian";
 
 import { BLOCK_REVIEW_VIEW_TYPE, BlockReviewManager } from "src/block-review/block-review-manager";
+import { BlockReviewReminderManager } from "src/block-review/block-review-reminder-manager";
 import { CommandManager } from "src/command-manager";
 import { DataManager } from "src/data/data-manager";
 import { DebugLoggerInstance } from "src/data/debug-logger";
@@ -24,6 +25,7 @@ export default class SRPlugin extends Plugin {
     private _commandManager: CommandManager | null = null;
     private _reminderManager: ReminderManager | null = null;
     private _blockReviewManager: BlockReviewManager | null = null;
+    private _blockReviewReminderManager: BlockReviewReminderManager | null = null;
     public isInitialized: boolean = false;
 
     async onload(): Promise<void> {
@@ -45,6 +47,9 @@ export default class SRPlugin extends Plugin {
             this.commandManager = new CommandManager(this, settingsManager, uiManager);
 
             this._blockReviewManager = new BlockReviewManager(this.app);
+            this._blockReviewReminderManager = new BlockReviewReminderManager(
+                this.blockReviewManager,
+            );
             this.registerView(
                 BLOCK_REVIEW_VIEW_TYPE,
                 (leaf) => new BlockReviewView(leaf, this.blockReviewManager),
@@ -57,6 +62,7 @@ export default class SRPlugin extends Plugin {
                 this.dataManager.loadData();
 
                 await this.blockReviewManager.onLayoutReady();
+                this.blockReviewReminderManager.restart();
 
                 // Set the preferred locale if it is not the default
                 if (settingsManager.settings.preferredLocale !== "-") {
@@ -148,8 +154,17 @@ export default class SRPlugin extends Plugin {
         return this._blockReviewManager;
     }
 
+    get blockReviewReminderManager(): BlockReviewReminderManager {
+        if (this._blockReviewReminderManager === null)
+            throw new Error("Block review reminder manager not initialized!!!");
+        return this._blockReviewReminderManager;
+    }
+
     onunload(): void {
         this.reminderManager.stopReviewReminders();
+        if (this._blockReviewReminderManager !== null) {
+            this._blockReviewReminderManager.stop();
+        }
         this.app.workspace.getLeavesOfType(REVIEW_QUEUE_VIEW_TYPE).forEach((leaf) => leaf.detach());
         this.app.workspace.getLeavesOfType(BLOCK_REVIEW_VIEW_TYPE).forEach((leaf) => leaf.detach());
         this.uiManager.destroy();

@@ -33,6 +33,25 @@ export interface BlockReviewConfig {
      * block regardless of group.
      */
     activeGroups: string[];
+
+    /**
+     * Periodic background check for due block-review blocks. When enabled the
+     * plugin pings the block review queue on a timer and surfaces a toast (and
+     * optionally opens the panel) when blocks are due.
+     */
+    blockReviewRemindersEnabled: boolean;
+
+    /** How often (in minutes) the reminder loop checks for due blocks. */
+    blockReviewReminderIntervalMinutes: number;
+
+    /** Show an Obsidian toast when due blocks are detected. */
+    blockReviewReminderNotify: boolean;
+
+    /** Automatically open the block review panel when due blocks are detected. */
+    blockReviewReminderAutoOpen: boolean;
+
+    /** Run a one-shot check on plugin startup. */
+    blockReviewReminderCheckOnStartup: boolean;
 }
 
 export const BLOCK_REVIEW_CONFIG_FILE = "ReviewConfig.md";
@@ -51,6 +70,11 @@ export const DEFAULT_BLOCK_REVIEW_CONFIG: BlockReviewConfig = {
     autoAdvance: true,
     reviewTags: ["#review"],
     activeGroups: [],
+    blockReviewRemindersEnabled: false,
+    blockReviewReminderIntervalMinutes: 5,
+    blockReviewReminderNotify: true,
+    blockReviewReminderAutoOpen: false,
+    blockReviewReminderCheckOnStartup: true,
 };
 
 const CONFIG_JSON_BLOCK = /```json\s*([\s\S]*?)```/;
@@ -131,6 +155,26 @@ export function mergeBlockReviewConfig(
                 : DEFAULT_BLOCK_REVIEW_CONFIG.autoAdvance,
         reviewTags: sanitizeStringArray(source.reviewTags, DEFAULT_BLOCK_REVIEW_CONFIG.reviewTags),
         activeGroups: sanitizeStringArray(source.activeGroups, []),
+        blockReviewRemindersEnabled:
+            typeof source.blockReviewRemindersEnabled === "boolean"
+                ? source.blockReviewRemindersEnabled
+                : DEFAULT_BLOCK_REVIEW_CONFIG.blockReviewRemindersEnabled,
+        blockReviewReminderIntervalMinutes: sanitizePositiveInt(
+            source.blockReviewReminderIntervalMinutes,
+            DEFAULT_BLOCK_REVIEW_CONFIG.blockReviewReminderIntervalMinutes,
+        ),
+        blockReviewReminderNotify:
+            typeof source.blockReviewReminderNotify === "boolean"
+                ? source.blockReviewReminderNotify
+                : DEFAULT_BLOCK_REVIEW_CONFIG.blockReviewReminderNotify,
+        blockReviewReminderAutoOpen:
+            typeof source.blockReviewReminderAutoOpen === "boolean"
+                ? source.blockReviewReminderAutoOpen
+                : DEFAULT_BLOCK_REVIEW_CONFIG.blockReviewReminderAutoOpen,
+        blockReviewReminderCheckOnStartup:
+            typeof source.blockReviewReminderCheckOnStartup === "boolean"
+                ? source.blockReviewReminderCheckOnStartup
+                : DEFAULT_BLOCK_REVIEW_CONFIG.blockReviewReminderCheckOnStartup,
     };
 }
 
@@ -146,4 +190,11 @@ function sanitizeStringArray(value: unknown, fallback: string[]): string[] {
         return [...fallback];
     }
     return value.map((entry) => String(entry).trim()).filter((entry) => entry.length > 0);
+}
+
+function sanitizePositiveInt(value: unknown, fallback: number): number {
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+        return Math.floor(value);
+    }
+    return fallback;
 }

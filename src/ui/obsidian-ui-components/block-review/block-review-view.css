@@ -59,6 +59,30 @@
     color: var(--text-faint);
 }
 
+/**
+ * Compact banner shown when the due queue is empty or a session just
+ * finished. Unlike the loading message this does not take over the view —
+ * the upcoming list renders beneath it.
+ */
+.block-review-empty-state {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background-color: var(--background-secondary);
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.block-review-empty-state-icon {
+    display: flex;
+    align-items: center;
+    color: var(--color-green);
+    flex: 0 0 auto;
+}
+
 .block-review-card {
     display: flex;
     flex-direction: column;
@@ -205,6 +229,25 @@
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
     white-space: nowrap;
+}
+
+.block-review-due.mod-error {
+    color: var(--color-red);
+    font-weight: 600;
+}
+
+.block-review-due.mod-warning {
+    color: var(--color-orange);
+    font-weight: 600;
+}
+
+.block-review-due.block-review-due-future {
+    color: var(--text-faint);
+}
+
+.block-review-due.block-review-due-new {
+    color: var(--color-blue);
+    font-weight: 600;
 }
 
 .block-review-review-now {

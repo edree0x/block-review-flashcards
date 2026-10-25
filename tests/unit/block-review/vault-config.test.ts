@@ -110,4 +110,46 @@ describe("vault config", () => {
         const merged = mergeBlockReviewConfig({ blockMarker: "!!", revealSeparator: "~!" });
         expect(merged.revealSeparator).toEqual("~!");
     });
+
+    test("defaults the reminder settings", () => {
+        const merged = mergeBlockReviewConfig({});
+        expect(merged.blockReviewRemindersEnabled).toEqual(false);
+        expect(merged.blockReviewReminderIntervalMinutes).toEqual(5);
+        expect(merged.blockReviewReminderNotify).toEqual(true);
+        expect(merged.blockReviewReminderAutoOpen).toEqual(false);
+        expect(merged.blockReviewReminderCheckOnStartup).toEqual(true);
+    });
+
+    test("round-trips reminder settings through serialize/parse", () => {
+        const config = {
+            ...DEFAULT_BLOCK_REVIEW_CONFIG,
+            blockReviewRemindersEnabled: true,
+            blockReviewReminderIntervalMinutes: 15,
+            blockReviewReminderNotify: false,
+            blockReviewReminderAutoOpen: true,
+            blockReviewReminderCheckOnStartup: false,
+        };
+        const merged = mergeBlockReviewConfig(
+            parseBlockReviewConfig(serializeBlockReviewConfig(config)),
+        );
+        expect(merged.blockReviewRemindersEnabled).toEqual(true);
+        expect(merged.blockReviewReminderIntervalMinutes).toEqual(15);
+        expect(merged.blockReviewReminderNotify).toEqual(false);
+        expect(merged.blockReviewReminderAutoOpen).toEqual(true);
+        expect(merged.blockReviewReminderCheckOnStartup).toEqual(false);
+    });
+
+    test("sanitizes a non-positive interval back to the default", () => {
+        const merged = mergeBlockReviewConfig({
+            blockReviewReminderIntervalMinutes: 0,
+        });
+        expect(merged.blockReviewReminderIntervalMinutes).toEqual(5);
+    });
+
+    test("floors a fractional interval to an integer", () => {
+        const merged = mergeBlockReviewConfig({
+            blockReviewReminderIntervalMinutes: 7.9,
+        });
+        expect(merged.blockReviewReminderIntervalMinutes).toEqual(7);
+    });
 });
